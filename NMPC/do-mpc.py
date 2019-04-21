@@ -27,6 +27,7 @@ path_do_mpc = '../'
 # Add do-mpc path to the current directory
 import sys
 sys.path.insert(0,path_do_mpc+'code')
+sys.path.append(r"/Users/githinjohn/Documents/casadi-osx-py27-v3.4.5")
 # Do not write bytecode to maintain clean directories
 sys.dont_write_bytecode = True
 # Compatibility for python 2.7 and python 3.0
@@ -113,7 +114,7 @@ while 1:
 #    a=ax.scatter(x[n+1,0],x[n+1,1])
 #    plt.pause(0.5)
 
-    x=move(configuration_1.simulator.x0_sim,configuration_1.optimizer.u_mpc,1)
+    #x=move(configuration_1.simulator.x0_sim,configuration_1.optimizer.u_mpc,1)
     a1=ax.scatter(x[0],x[1])
 
     lam=1e7
@@ -121,10 +122,9 @@ while 1:
     lambda_Y=np.identity(3)
     
     V=(lam)*exp(-(gamma+((xo[0]-x[0])**2)/(rx**2)+((xo[1]-x[1])**2)/(ry**2)))
-    print "cost", V
-    print "x cost:",10*(x[0]-Y_ref[0])**2,"y cost:",10*(x[1]-Y_ref[1])**2,"theta cost:", (x[2]-Y_ref[2])**2
-    a2=ax.arrow(x[0],x[1],3*math.cos(x[2]),3*math.sin(x[2]), head_width=0.08, head_length=0.00002)
-    plt.pause(0.1)
+    #print "cost", V
+    #print "x cost:",10*(x[0]-Y_ref[0])**2,"y cost:",10*(x[1]-Y_ref[1])**2,"theta cost:", (x[2]-Y_ref[2])**2
+    
     """
     ----------------------------
     do-mpc: Simulator
@@ -132,6 +132,10 @@ while 1:
     """
     # Simulate the system one step using the solution obtained in the optimization
     configuration_1.make_step_simulator()
+    x=configuration_1.simulator.xf_sim
+    
+    a2=ax.arrow(x[0],x[1],3*math.cos(x[2]),3*math.sin(x[2]), head_width=0.08, head_length=0.00002)
+    plt.pause(0.1)
 
     """
     ----------------------------

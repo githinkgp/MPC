@@ -198,6 +198,8 @@ class configuration:
         opts["ipopt.tol"] = 1e-6
         # Setup the solver
         solver = nlpsol("solver", self.optimizer.nlp_solver, nlp_dict_out['nlp_fcn'], opts)
+        #J=solver.jacG()
+        #print "J: ", J
         arg = {}
         # Initial condition
         arg["x0"] = nlp_dict_out['vars_init']

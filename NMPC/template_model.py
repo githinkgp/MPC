@@ -24,6 +24,7 @@
 from casadi import *
 import numpy as NP
 import core_do_mpc
+import math
 def model():
 
     """
@@ -48,15 +49,18 @@ def model():
 
     x    = SX.sym("x") # Concentration A
     y    = SX.sym("y") # Concentration B
-    theta    = SX.sym("theta") # Reactor Temprature
+    phi    = SX.sym("phi") # Reactor Temprature
+    vx = SX.sym("vx")
+    vy = SX.sym("vy")
+    w = SX.sym("w")
     #T_K    = SX.sym("T_K") # Jacket Temprature
 
     # Define the algebraic states as CasADi symbols
 
     # Define the control inputs as CasADi symbols
 
-    u      = SX.sym("u") # Vdot/V_R [h^-1]
-    w  = SX.sym("w") #Q_dot second control input
+    d      = SX.sym("d") # Vdot/V_R [h^-1]
+    delta  = SX.sym("delta") #Q_dot second control input
 
     # Define time-varying parameters that can change at each step of the prediction and at each sampling time of the MPC controller. For example, future weather predictions
 
@@ -74,11 +78,35 @@ def model():
     #K_2 =  K0_bc * exp((-E_A_bc)/((T_R+273.15)))
     #K_3 = K0_ad * exp((-alpha*E_A_ad)/((T_R+273.15)))
 
-    # Define the differential equations
+    
+    
+    #Define aux variables
+    
+    C_m1, C_m2, C_f, C_r, D_f, D_r, B_f, B_r, C_r, C_d  = np.ones(10)
+    lf=0.15
+    lr=0.15
+    m=2
+    I_z=0.5
+    
+    #alpha_f = -atan((w*lf + vy)/vx)+delta
+    #alpha_r = atan((w*lr-vy)/vx)
+    
+    
+    #F_fy = D_f*sin(C_f*atan(B_f*(-atan((w*lf + vy)/vx)+delta)))
+    #F_ry = D_r*sin(C_r*atan(B_r*atan((w*lr-vy)/vx)))
+    #F_rx = (C_m1-C_m2*vx)*d-C_r-C_d*vx**2
 
-    dx=u*cos(theta)
-    dy=u*sin(theta)
-    dtheta=w
+    # Define the differential equations
+    dx = vx*cos(phi)-vy*sin(phi)
+    dy = vx*sin(phi)+vy*cos(phi)
+    dphi = w
+    dvx = (((C_m1-C_m2*vx)*d-C_r-C_d*vx**2)-(D_f*sin(C_f*atan(B_f*(-atan((w*lf + vy)/vx)+delta))))*sin(delta)+m*vy*w)/m
+    dvy = ((D_r*sin(C_r*atan(B_r*atan((w*lr-vy)/vx))))+(D_f*sin(C_f*atan(B_f*(-atan((w*lf + vy)/vx)+delta))))*cos(delta)-m*vx*w)/m
+    dw = ((D_f*sin(C_f*atan(B_f*(-atan((w*lf + vy)/vx)+delta))))*lf*cos(delta)-(D_r*sin(C_r*atan(B_r*atan((w*lr-vy)/vx))))*lr)/I_z
+    
+    #dx=u*cos(theta)
+    #dy=u*sin(theta)
+    #dtheta=w
     #dC_a = F*(C_A0 - C_a) -K_1*C_a - K_3*(C_a**2)
     #dC_b = -F*C_b + K_1*C_a -K_2*C_b
     #dT_R = ((K_1*C_a*H_R_ab + K_2*C_b*H_R_bc + K_3*(C_a**2)*H_R_ad)/(-Rou*Cp)) + F*(T_in-T_R) +(((K_w*A_R)*(T_K-T_R))/(Rou*Cp*V_R))
@@ -86,11 +114,11 @@ def model():
 
     # Concatenate differential states, algebraic states, control inputs and right-hand-sides
 
-    _x = vertcat(x, y, theta)
+    _x = vertcat(x, y, phi, vx, vy, w)
 
-    _u = vertcat(u, w)
+    _u = vertcat(d, delta)
 
-    _xdot = vertcat(dx, dy, dtheta)
+    _xdot = vertcat(dx, dy, dphi, dvx, dvy, dw)
 
     _p = vertcat(alpha, beta)
     #_p = []
@@ -106,29 +134,35 @@ def model():
     --------------------------------------------------------------------------
     """
     # Initial condition for the states
-    x_0 = 0.0 # This is the initial concentration inside the tank [mol/l]
-    y_0 = 0.0 # This is the controlled variable [mol/l]
-    theta_0 = 0.0 #[C]
+    x_0 = 0.5 # This is the initial concentration inside the tank [mol/l]
+    y_0 = 0.5 # This is the controlled variable [mol/l]
+    phi_0 = 0.5 #[C]
+    vx_0 = 0.5
+    vy_0 = 0.5
+    w_0 = 0.5
 #    T_K_0 = 130.0 #[C]
-    x0 = NP.array([x_0, y_0, theta_0])
+    x0 = NP.array([x_0, y_0, phi_0, vx_0, vy_0, w_0])
 
     # Bounds on the states. Use "inf" for unconstrained states
     x_lb = 0.0;			x_ub = 100.0
     y_lb = 0.0;			y_ub = 100.0
-    theta_lb = 0.0;			theta_ub = 6.28
+    phi_lb = -3.14;			phi_ub = 3.14
+    vx_lb = 0.0;         vx_ub = 5.0
+    vy_lb = 0.0;         vy_ub = 5.0
+    w_lb = -1.0;         w_ub = 1.0
     #T_K_lb = 50.0;			T_K_ub = 180
-    X_lb = NP.array([x_lb, y_lb, theta_lb])
-    X_ub = NP.array([x_ub, y_ub, theta_ub])
+    X_lb = NP.array([x_lb, y_lb, phi_lb, vx_lb, vy_lb, w_lb])
+    X_ub = NP.array([x_ub, y_ub, phi_ub, vx_ub, vy_ub, w_ub])
 
     # Bounds on the control inputs. Use "inf" for unconstrained inputs
-    u_lb = 0.0;                 u_ub = 5.0;
-    w_lb = -1.0;         w_ub = 1.0;
-    U_lb = NP.array([u_lb, w_lb])
-    U_ub = NP.array([u_ub, w_ub])
-    u0 = NP.array([0.0,0.0])
+    d_lb = -10.0;                 d_ub = 10.0;
+    delta_lb = -pi/2;         delta_ub = pi/2;
+    U_lb = NP.array([d_lb, delta_lb])
+    U_ub = NP.array([d_ub, delta_ub])
+    u0 = NP.array([0.2, 0.2])
 
     # Scaling factors for the states and control inputs. Important if the system is ill-conditioned
-    x_scaling = NP.array([1.0, 1.0, 1.0])
+    x_scaling = NP.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
     u_scaling = NP.array([1.0, 1.0])
 
     # Other possibly nonlinear constraints in the form cons(x,u,p) <= cons_ub
@@ -158,7 +192,7 @@ def model():
     """
     
     lambda_Y=NP.identity(3)
-    Y_ref=[80, 80, 1.57]
+    Y_ref=[80, 80, 1.57,0, 0 ,0]
     rx=15
     ry=10
     lam=1e7
@@ -167,7 +201,7 @@ def model():
     # Define the cost function
     # Lagrange term
     #lterm =  1e4*((C_b - 0.9)**2 + (C_a - 1.1)**2)
-    lterm = 10*(x-Y_ref[0])**2+10*(y-Y_ref[1])**2+(theta-Y_ref[2])**2 + (lam)*exp(-(gamma+((xo[0]-x)**2)/(rx**2)+((xo[1]-y)**2)/(ry**2)))
+    lterm = 10*(x-Y_ref[0])**2+10*(y-Y_ref[1])**2+(phi-Y_ref[2])**2 + (vx-Y_ref[3])**2 + (vy-Y_ref[4])**2 + (w-Y_ref[5])**2 + (lam)*exp(-(gamma+((xo[0]-x)**2)/(rx**2)+((xo[1]-y)**2)/(ry**2)))
     #lterm =  - C_b
     # Mayer term
 #    mterm =  1e4*((C_b - 0.9)**2 + (C_a - 1.1)**2)
